@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int         @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  email         String      @unique
+  password      String
+  googleAccount String     @default("")
+  blockedIps    BlockedIp[]
+  createdAt     DateTime    @default(now())
+}
+
+model Click {
+  id           Int      @id @default(autoincrement())
+  gclid        String
+  ip           String
+  userAgent    String
+  referrer     String  @default("")
+  adId         String  @default("")
+  adGroupId    String  @default("")
+  campaignId   String  @default("")
+  timestamp    DateTime @default(now())
+  sessionTime  Float   @default(0.0)
+  isFraudulent Boolean  @default(false)
+}
+
+model BlockedIp {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  ip         String
+  clicks     Int      @default(0)
+  moneySaved Float    @default(0.0)
+  reason     String
+  threatLevel String  @default("low")
+  blockDate  DateTime @default(now())
+  user       User    @relation(fields: [userId], references: [id])
+}

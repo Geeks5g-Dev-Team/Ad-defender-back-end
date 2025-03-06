@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Click" ALTER COLUMN "referrer" SET DEFAULT '',
+ALTER COLUMN "adId" SET DEFAULT '',
+ALTER COLUMN "adGroupId" SET DEFAULT '',
+ALTER COLUMN "campaignId" SET DEFAULT '';
