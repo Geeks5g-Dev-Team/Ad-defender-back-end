@@ -8,12 +8,34 @@ app = Flask(__name__)
 
 NEST_API = "http://localhost:3000"
 
+def get_location_from_ip(ip):
+  """Fetches the location of an IP address using ip-api.com."""
+  if not ip or ip == "127.0.0.1":
+    return {"error": "Invalid or local IP"}
+
+  url = f"http://ip-api.com/json/{ip}"
+  try:
+    response = requests.get(url, timeout=5)
+    response.raise_for_status()
+    data = response.json()
+    if data.get("status") == "success":
+        return {
+          "lat": data.get("lat"),
+          "lon": data.get("lon"),
+        }
+    else:
+      return {"error": data.get("message", "Location not found")}
+  except requests.exceptions.RequestException as e:
+    return {"error": str(e)}
+
 @app.route('/track', methods=['POST'])
 def track_click():
   """Receives click data and forwards it to NestJS."""
   user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
   if user_ip:
     user_ip = user_ip.split(',')[0].strip()
+    location = get_location_from_ip("23.19.57.231")
+    print(location)
 
   data = request.json
   if not data.get("gclid"):
@@ -23,6 +45,7 @@ def track_click():
     "gclid": data.get("gclid"),
     # "ip": user_ip,
     "ip": data.get("ip"),
+    "location": location,
     "userAgent": data.get("userAgent"),
     "referrer": data.get("referrer"),
     "adId": data.get("adId"),

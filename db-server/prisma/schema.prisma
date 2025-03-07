@@ -22,6 +22,7 @@ model Click {
   id           Int      @id @default(autoincrement())
   gclid        String
   ip           String
+  location     Json     @default("{}")
   userAgent    String
   referrer     String  @default("")
   adId         String  @default("")
