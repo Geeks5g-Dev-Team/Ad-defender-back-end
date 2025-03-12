@@ -46,6 +46,14 @@ export class UserService {
     });
   }
 
+  async findByGoogleAccount(googleAccount: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        googleAccount: googleAccount,
+      },
+    });
+  }
+
   async update(id: number, data: UpdateUserDto) {
     // If updating password, hash the new password before saving
     if (data.password) {

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
@@ -20,7 +21,10 @@ export class UserController {
   }
 
   @Get()
-  findAll() {
+  findAll(@Query('googleAccount') googleAccount?: string) {
+    if (googleAccount) {
+      return this.userService.findByGoogleAccount(googleAccount); // Ensure this method exists
+    }
     return this.userService.findAll();
   }
 

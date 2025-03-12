@@ -18,6 +18,13 @@ export class CreateClickDto {
 
   @IsNotEmpty()
   @IsString()
+  customerId: string;
+
+  @IsNotEmpty()
+  location: object;
+
+  @IsNotEmpty()
+  @IsString()
   userAgent: string;
 
   @IsOptional()
