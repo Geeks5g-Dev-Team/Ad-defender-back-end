@@ -42,4 +42,9 @@ export class UserController {
   remove(@Param('id') id: string) {
     return this.userService.remove(parseInt(id));
   }
+
+  @Post('login')
+  async login(@Body() loginUserDto: { email: string; password: string }) {
+    return this.userService.login(loginUserDto.email, loginUserDto.password);
+  }
 }

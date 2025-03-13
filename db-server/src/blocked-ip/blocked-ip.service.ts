@@ -25,4 +25,10 @@ export class BlockedIpService {
   async remove(id: number) {
     return this.prisma.blockedIp.delete({ where: { id } });
   }
+
+  async findByUserId(userId: number) {
+    return this.prisma.blockedIp.findMany({
+      where: { userId },
+    });
+  }
 }

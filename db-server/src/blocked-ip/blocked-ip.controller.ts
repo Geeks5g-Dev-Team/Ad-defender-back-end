@@ -38,4 +38,9 @@ export class BlockedIpController {
   remove(@Param('id') id: string) {
     return this.blockedIpService.remove(parseInt(id));
   }
+
+  @Get('user/:userId')
+  findByUserId(@Param('userId') userId: string) {
+    return this.blockedIpService.findByUserId(parseInt(userId));
+  }
 }
