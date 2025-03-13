@@ -183,23 +183,23 @@ def select_customer_id():
 
 @app.route("/get-campaigns", methods=["POST"])
 def get_campaigns():
-    """Retrieves campaigns for the selected Google Ads Customer ID."""
-    data = request.json
-    customer_id = data.get("customerId")
+  """Retrieves campaigns for the selected Google Ads Customer ID."""
+  data = request.json
+  customer_id = data.get("customerId")
 
-    if not customer_id:
-      return jsonify({"error": "Customer ID is required"}), 400
+  if not customer_id:
+    return jsonify({"error": "Customer ID is required"}), 400
 
-    # ✅ Ensure access token is valid
-    # access_token = get_valid_access_token()
-    access_token = TOKENS_STORE.get("access_token")
-    print(f"🔑 Retrieved access token: {access_token}")
-    if not access_token or access_token == None:
-      return jsonify({"error": "Session expired, please re-authenticate"}), 401
-    
-    # ✅ Fetch campaigns
-    campaigns = get_google_ads_campaigns(access_token, customer_id)
-    return jsonify({"campaigns": campaigns})
+  # ✅ Ensure access token is valid
+  # access_token = get_valid_access_token()
+  access_token = TOKENS_STORE.get("access_token")
+  print(f"🔑 Retrieved access token: {access_token}")
+  if not access_token or access_token == None:
+    return jsonify({"error": "Session expired, please re-authenticate"}), 401
+  
+  # ✅ Fetch campaigns
+  campaigns = get_google_ads_campaigns(access_token, customer_id)
+  return jsonify({"campaigns": campaigns})
 
 @app.route("/get-campaign-details", methods=["POST"])
 def get_campaign_details():
@@ -207,6 +207,8 @@ def get_campaign_details():
   data = request.json
   customer_id = data.get("customerId")
   campaign_id = data.get("campaignId")
+  start_date = data.get("start_date")
+  end_date = data.get("end_date")
 
   if not customer_id or not campaign_id:
     return jsonify({"error": "Customer ID and Campaign ID are required"}), 400
@@ -216,7 +218,7 @@ def get_campaign_details():
     return jsonify({"error": "Session expired, please re-authenticate"}), 401
 
   # ✅ Fetch campaign details
-  campaign_details = get_google_ads_campaign_details(access_token, customer_id, campaign_id)
+  campaign_details = get_google_ads_campaign_details(access_token, customer_id, campaign_id, start_date, end_date)
 
   if campaign_details:
     return jsonify({"campaign": campaign_details})
@@ -228,6 +230,8 @@ def get_overall_performance():
     """Retrieves overall performance metrics for all campaigns."""
     data = request.json
     customer_id = data.get("customerId")
+    start_date = data.get("start_date")
+    end_date = data.get("end_date")
 
     if not customer_id:
       return jsonify({"error": "Customer ID is required"}), 400
@@ -239,7 +243,7 @@ def get_overall_performance():
       return jsonify({"error": "Session expired, please re-authenticate"}), 401
 
     # ✅ Fetch overall campaign performance
-    performance = get_overall_campaign_performance(access_token, customer_id)
+    performance = get_overall_campaign_performance(access_token, customer_id, start_date, end_date)
 
     if performance:
       return jsonify({"performance": performance})

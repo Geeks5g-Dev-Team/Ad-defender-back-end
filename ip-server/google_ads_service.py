@@ -1,5 +1,6 @@
 import requests
 from flask import session
+from datetime import datetime
 
 # Google OAuth & API Config
 CLIENT_ID = "489689065901-tknvbdhgpbqihc5qnm0kt0hvsjfupbcr.apps.googleusercontent.com"
@@ -109,40 +110,71 @@ def update_user_google_account(id, google_account):
         return None
 
 def get_google_ads_campaigns(access_token, customer_id):
-    """Fetches campaigns for a selected Google Ads Customer ID."""
+    """Fetches campaigns for a selected Google Ads Customer ID within a date range."""
     url = f"https://googleads.googleapis.com/v19/customers/{customer_id}/googleAds:search"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,
     }
 
-    # ✅ Google Ads Query Language (GAQL) query to get campaign names & status
-    query = "SELECT campaign.id, campaign.name, campaign.status FROM campaign WHERE campaign.status = 'ENABLED'"
+    # ✅ Google Ads Query Language (GAQL) query with DATE FILTER
+    query = f"""
+        SELECT 
+          campaign.id, 
+          campaign.name, 
+          campaign.status, 
+          metrics.impressions, 
+          metrics.clicks, 
+          metrics.conversions, 
+          metrics.cost_micros 
+        FROM campaign 
+        WHERE campaign.status = 'ENABLED'
+    """
 
     response = requests.post(url, headers=headers, json={"query": query})
 
     if response.status_code == 200:
         data = response.json()
-        campaigns = [
-            {"id": row["campaign"]["id"], "name": row["campaign"]["name"]}
-            for row in data.get("results", [])
-        ]
+        def safe_int(value):
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return 0
+        campaigns = []
+        for row in data.get("results", []):
+            clicks = safe_int(row["metrics"].get("clicks", 0))
+            cost = safe_int(row["metrics"].get("costMicros", 0)) / 1_000_000  # Convert micros to currency
+            cpc = round(cost / clicks, 2) if clicks > 0 else 0  # Avoid division by zero
+
+            campaigns.append({
+                "id": row["campaign"]["id"],
+                "name": row["campaign"]["name"],
+                "status": row["campaign"]["status"],
+                "impressions": safe_int(row["metrics"].get("impressions", 0)),
+                "clicks": clicks,
+                "cost": cost,
+                "cpc": cpc
+            })
         return campaigns
     else:
         print(f"❌ Failed to fetch campaigns: {response.text}")
         return []
     
-def get_google_ads_campaign_details(access_token, customer_id, campaign_id):
-    """Fetches detailed information for a specific Google Ads campaign."""
+def get_google_ads_campaign_details(access_token, customer_id, campaign_id, start_date=None, end_date=None):
+    """Fetches detailed metrics for a specific campaign within a date range."""
     url = f"https://googleads.googleapis.com/v19/customers/{customer_id}/googleAds:search"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,
     }
 
-    # ✅ GAQL Query for fetching detailed campaign information
+    # ✅ Default to today's date if no range is provided
+    today = datetime.today().strftime("%Y-%m-%d")
+    start_date = start_date or today
+    end_date = end_date or today
+
     query = f"""
-        SELECT
+        SELECT 
             campaign.id,
             campaign.name,
             campaign.status,
@@ -156,16 +188,26 @@ def get_google_ads_campaign_details(access_token, customer_id, campaign_id):
             metrics.cost_micros
         FROM campaign
         WHERE campaign.id = {campaign_id}
+        AND segments.date BETWEEN '{start_date}' AND '{end_date}'
     """
 
     response = requests.post(url, headers=headers, json={"query": query})
 
     if response.status_code == 200:
         data = response.json()
+        def safe_int(value):
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return 0
 
         if "results" in data and data["results"]:
             campaign = data["results"][0]["campaign"]  # Get the first result
             metrics = data["results"][0]["metrics"]
+
+            clicks = safe_int(metrics.get("clicks", 0))
+            cost = safe_int(metrics.get("costMicros", 0)) / 1_000_000  # Convert micros to currency
+            cpc = round(cost / clicks, 2) if clicks > 0 else 0  # Avoid division by zero
 
             return {
                 "id": campaign["id"],
@@ -175,10 +217,11 @@ def get_google_ads_campaign_details(access_token, customer_id, campaign_id):
                 "end_date": campaign.get("endDate", "N/A"),
                 "bidding_strategy": campaign.get("biddingStrategyType", "Unknown"),
                 "channel_type": campaign.get("advertisingChannelType", "Unknown"),
-                "impressions": int(metrics.get("impressions", 0)),
-                "clicks": int(metrics.get("clicks", 0)),
-                "conversions": int(metrics.get("conversions", 0)),
-                "cost": int(metrics.get("costMicros", 0)) / 1_000_000  # Convert micros to currency
+                "impressions": safe_int(metrics.get("impressions", 0)),
+                "conversions": safe_int(metrics.get("conversions", 0)),
+                "clicks": clicks,
+                "cost": cost,
+                "cpc": cpc  # ✅ Include CPC
             }
         else:
             print(f"⚠️ No data found for campaign {campaign_id}.")
@@ -187,31 +230,33 @@ def get_google_ads_campaign_details(access_token, customer_id, campaign_id):
         print(f"❌ Failed to fetch campaign details: {response.text}")
         return None
 
-def get_overall_campaign_performance(access_token, customer_id):
-    """Fetches and summarizes all campaign performance for a Google Ads account."""
+def get_overall_campaign_performance(access_token, customer_id, start_date=None, end_date=None):
+    """Fetches overall performance metrics for campaigns within a date range."""
     url = f"https://googleads.googleapis.com/v19/customers/{customer_id}/googleAds:search"
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "developer-token": DEVELOPER_TOKEN
+        "developer-token": DEVELOPER_TOKEN,
     }
 
-    query = """
-        SELECT
-          campaign.id,
-          campaign.name,
+    today = datetime.today().strftime("%Y-%m-%d")
+    start_date = start_date or today
+    end_date = end_date or today
+
+    query = f"""
+        SELECT 
           metrics.impressions,
           metrics.clicks,
           metrics.conversions,
           metrics.cost_micros
         FROM campaign
         WHERE campaign.status = 'ENABLED'
+        AND segments.date BETWEEN '{start_date}' AND '{end_date}'
     """
 
     response = requests.post(url, headers=headers, json={"query": query})
 
     if response.status_code == 200:
         data = response.json()
-
         def safe_int(value):
             try:
                 return int(value)
@@ -224,14 +269,16 @@ def get_overall_campaign_performance(access_token, customer_id):
         total_conversions = sum(safe_int(row["metrics"].get("conversions", 0)) for row in data.get("results", []))
         total_cost_micros = sum(safe_int(row["metrics"].get("costMicros", 0)) for row in data.get("results", []))
         total_cost = total_cost_micros / 1_000_000  # Convert micros to currency units
+        cpc = round(total_cost / total_clicks, 2) if total_clicks > 0 else 0  # Avoid division by zero
 
         return {
             "total_campaigns": len(data.get("results", [])),
             "total_impressions": total_impressions,
             "total_clicks": total_clicks,
             "total_conversions": total_conversions,
-            "total_cost": total_cost
+            "total_cost": total_cost,
+            "cpc": cpc
         }
     else:
-        print(f"❌ Failed to fetch campaigns: {response.text}")
+        print(f"❌ Failed to fetch overall performance: {response.text}")
         return None
