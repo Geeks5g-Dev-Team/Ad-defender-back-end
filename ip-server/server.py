@@ -6,6 +6,7 @@ import threading
 import time
 import fraud_detection
 from google_ads_service import (
+  get_google_ads_campaign_details,
   get_google_auth_url,
   exchange_code_for_token,
   get_google_ads_customer_ids,
@@ -84,6 +85,11 @@ def track_click():
 
   clean_click_data = {k: v for k, v in click_data.items() if v is not None}
   response = requests.post(f"{NEST_API}/clicks", json=clean_click_data)
+
+  # ✅ Run fraud detection after saving the click
+  print("🚀 Running fraud detection after click...")
+  run_fraud_detection()
+
   return response.json()
 
 @app.route('/detect-fraud', methods=['GET'])
@@ -195,6 +201,28 @@ def get_campaigns():
     campaigns = get_google_ads_campaigns(access_token, customer_id)
     return jsonify({"campaigns": campaigns})
 
+@app.route("/get-campaign-details", methods=["POST"])
+def get_campaign_details():
+  """Retrieves details for a specific Google Ads campaign."""
+  data = request.json
+  customer_id = data.get("customerId")
+  campaign_id = data.get("campaignId")
+
+  if not customer_id or not campaign_id:
+    return jsonify({"error": "Customer ID and Campaign ID are required"}), 400
+
+  access_token = TOKENS_STORE.get("access_token")
+  if not access_token:
+    return jsonify({"error": "Session expired, please re-authenticate"}), 401
+
+  # ✅ Fetch campaign details
+  campaign_details = get_google_ads_campaign_details(access_token, customer_id, campaign_id)
+
+  if campaign_details:
+    return jsonify({"campaign": campaign_details})
+  else:
+    return jsonify({"error": "Failed to retrieve campaign details"}), 500
+
 @app.route("/get-overall-performance", methods=["POST"])
 def get_overall_performance():
     """Retrieves overall performance metrics for all campaigns."""
@@ -219,5 +247,5 @@ def get_overall_performance():
       return jsonify({"error": "Failed to retrieve campaign performance"}), 500
 
 if __name__ == '__main__':
-  threading.Thread(target=schedule_fraud_detection, daemon=True).start()
+  # threading.Thread(target=schedule_fraud_detection, daemon=True).start()
   app.run(host='0.0.0.0', port=5000, debug=True)

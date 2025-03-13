@@ -131,6 +131,61 @@ def get_google_ads_campaigns(access_token, customer_id):
     else:
         print(f"❌ Failed to fetch campaigns: {response.text}")
         return []
+    
+def get_google_ads_campaign_details(access_token, customer_id, campaign_id):
+    """Fetches detailed information for a specific Google Ads campaign."""
+    url = f"https://googleads.googleapis.com/v19/customers/{customer_id}/googleAds:search"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "developer-token": DEVELOPER_TOKEN,
+    }
+
+    # ✅ GAQL Query for fetching detailed campaign information
+    query = f"""
+        SELECT
+            campaign.id,
+            campaign.name,
+            campaign.status,
+            campaign.start_date,
+            campaign.end_date,
+            campaign.bidding_strategy_type,
+            campaign.advertising_channel_type,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.conversions,
+            metrics.cost_micros
+        FROM campaign
+        WHERE campaign.id = {campaign_id}
+    """
+
+    response = requests.post(url, headers=headers, json={"query": query})
+
+    if response.status_code == 200:
+        data = response.json()
+
+        if "results" in data and data["results"]:
+            campaign = data["results"][0]["campaign"]  # Get the first result
+            metrics = data["results"][0]["metrics"]
+
+            return {
+                "id": campaign["id"],
+                "name": campaign["name"],
+                "status": campaign["status"],
+                "start_date": campaign.get("startDate", "N/A"),
+                "end_date": campaign.get("endDate", "N/A"),
+                "bidding_strategy": campaign.get("biddingStrategyType", "Unknown"),
+                "channel_type": campaign.get("advertisingChannelType", "Unknown"),
+                "impressions": int(metrics.get("impressions", 0)),
+                "clicks": int(metrics.get("clicks", 0)),
+                "conversions": int(metrics.get("conversions", 0)),
+                "cost": int(metrics.get("costMicros", 0)) / 1_000_000  # Convert micros to currency
+            }
+        else:
+            print(f"⚠️ No data found for campaign {campaign_id}.")
+            return None
+    else:
+        print(f"❌ Failed to fetch campaign details: {response.text}")
+        return None
 
 def get_overall_campaign_performance(access_token, customer_id):
     """Fetches and summarizes all campaign performance for a Google Ads account."""
