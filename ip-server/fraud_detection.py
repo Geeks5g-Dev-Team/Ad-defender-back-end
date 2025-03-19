@@ -1,7 +1,9 @@
+from flask import session
 import requests
 import pandas as pd
 import re
 from datetime import datetime, timedelta, timezone
+from google_ads_service import block_ips_in_google_ads
 
 # NestJS API URL
 NEST_API = "http://localhost:3000"
@@ -140,6 +142,13 @@ def detect_fraudulent_clicks():
         if customer_id:
             print(f"🚀 Sending {ip} to block list for customer {customer_id} - Reason: {reason}")
             send_fraudulent_ip(ip, reason, clicks, customer_id)
+
+            # ✅ Block the IP in Google Ads
+            access_token = session.get("access_token")
+            if access_token:
+                block_ips_in_google_ads(access_token, customer_id, [ip])
+            else:
+                print(f"⚠️ Skipping Google Ads IP block for {ip} due to missing access token.")
         else:
             print(f"⚠️ No customer ID found for {ip}, skipping block.")
 

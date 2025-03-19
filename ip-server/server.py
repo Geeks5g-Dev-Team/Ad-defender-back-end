@@ -7,6 +7,7 @@ import time
 import fraud_detection
 from google_ads_service import (
   get_google_ads_campaign_details,
+  get_google_ads_clicks,
   get_google_auth_url,
   exchange_code_for_token,
   get_google_ads_customer_ids,
@@ -44,13 +45,13 @@ def get_location_from_ip(ip):
     response.raise_for_status()
     data = response.json()
     if data.get("status") == "success":
-        return {
-          "lat": data.get("lat"),
-          "lon": data.get("lon"),
-          "city": data.get("city"),
-          "region": data.get("regionName"),
-          "country": data.get("country"),
-        }
+      return {
+        "lat": data.get("lat"),
+        "lon": data.get("lon"),
+        "city": data.get("city"),
+        "region": data.get("regionName"),
+        "country": data.get("country"),
+      }
     else:
       return {"error": data.get("message", "Location not found")}
   except requests.exceptions.RequestException as e:
@@ -106,8 +107,8 @@ def schedule_fraud_detection():
 
 @app.route("/google-auth")
 def google_auth():
-    """Redirects the user to Google's OAuth 2.0 authorization page."""
-    return redirect(get_google_auth_url())
+  """Redirects the user to Google's OAuth 2.0 authorization page."""
+  return redirect(get_google_auth_url())
 
 @app.route("/callback")
 def google_callback():
@@ -126,9 +127,8 @@ def google_callback():
   session["access_token"] = access_token
   session["refresh_token"] = refresh_token
   session.modified = True
-
-  print("-----------",session.get("access_token"))
-  print("-----------",session.get("refresh_token"))
+  requests.get(f"http://localhost:5000/test-session")
+  print(f"🔑 Stored access token in session: {access_token}")
 
   TOKENS_STORE["access_token"] = access_token
   TOKENS_STORE["refresh_token"] = refresh_token
@@ -249,6 +249,42 @@ def get_overall_performance():
       return jsonify({"performance": performance})
     else:
       return jsonify({"error": "Failed to retrieve campaign performance"}), 500
+
+# Debugging
+@app.route("/test-session")
+def test_session():
+  session["access_token"] = "Hello, Flask!"
+  session.modified = True
+  return jsonify({"message": "Session set!"})
+
+@app.route("/get-session")
+def get_session():
+  value = session.get("access_token", "Session not found")
+  return jsonify({"session_value": value})
+
+@app.route("/get-clicks", methods=["POST"])
+def get_clicks():
+  """Retrieves click data for a specific Google Ads Customer ID from Google Ads API."""
+  data = request.json
+  customer_id = data.get("customerId")
+  start_date = data.get("start_date")
+  end_date = data.get("end_date")
+
+  if not customer_id:
+    return jsonify({"error": "Customer ID is required"}), 400
+
+  # ✅ Ensure access token is valid
+  access_token = TOKENS_STORE.get("access_token")
+  if not access_token:
+    return jsonify({"error": "Session expired, please re-authenticate"}), 401
+
+  # ✅ Fetch click data from Google Ads API
+  clicks_data = get_google_ads_clicks(access_token, customer_id, start_date, end_date)
+
+  if clicks_data:
+    return jsonify({"clicks": clicks_data})
+  else:
+    return jsonify({"error": "Failed to retrieve click data"}), 500
 
 if __name__ == '__main__':
   # threading.Thread(target=schedule_fraud_detection, daemon=True).start()

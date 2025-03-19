@@ -1,6 +1,6 @@
 import requests
 from flask import session
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Google OAuth & API Config
 CLIENT_ID = "489689065901-tknvbdhgpbqihc5qnm0kt0hvsjfupbcr.apps.googleusercontent.com"
@@ -281,4 +281,71 @@ def get_overall_campaign_performance(access_token, customer_id, start_date=None,
         }
     else:
         print(f"❌ Failed to fetch overall performance: {response.text}")
+        return None
+    
+def get_google_ads_clicks(access_token, customer_id, start_date=None, end_date=None):
+    """Fetches the total number of clicks for the last 5 days."""
+    
+    url = f"https://googleads.googleapis.com/v19/customers/{customer_id}/googleAds:search"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "developer-token": DEVELOPER_TOKEN,
+    }
+
+    # ✅ Default to last 5 days
+    today = datetime.today().strftime("%Y-%m-%d")
+    five_days_ago = (datetime.today() - timedelta(days=5)).strftime("%Y-%m-%d")
+    start_date = start_date or five_days_ago
+    end_date = end_date or today
+
+    # ✅ Fetch only the total number of clicks per day
+    query = f"""
+        SELECT 
+          segments.date,
+          metrics.clicks
+        FROM campaign
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+        ORDER BY segments.date DESC
+    """
+
+    response = requests.post(url, headers=headers, json={"query": query})
+
+    if response.status_code == 200:
+        data = response.json()
+
+        # Store clicks per day
+        clicks_per_day = {row["segments"]["date"]: int(row["metrics"].get("clicks", 0)) for row in data.get("results", [])}
+
+        return clicks_per_day  # ✅ Returns a dictionary: { "2025-03-19": 45, "2025-03-18": 32, ... }
+    else:
+        print(f"❌ Failed to fetch click data: {response.text}")
+        return {}
+    
+def block_ips_in_google_ads(access_token, customer_id, blocked_ips):
+    """Adds blocked IP addresses to Google Ads account."""
+    url = f"https://googleads.googleapis.com/v19/customers/{customer_id}/googleAds:mutate"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "developer-token": DEVELOPER_TOKEN
+    }
+
+    operations = []
+    for ip in blocked_ips:
+        operations.append({
+            "create": {
+                "ipBlock": {"ipAddress": ip}
+            }
+        })
+
+    payload = {
+        "mutate_operations": operations
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        print("✅ Successfully blocked IPs in Google Ads!")
+        return response.json()
+    else:
+        print(f"❌ Failed to block IPs in Google Ads: {response.text}")
         return None
